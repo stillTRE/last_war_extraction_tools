@@ -1,0 +1,60 @@
+{
+  "name": "last-war-screenshot-extractor",
+  "version": "1.0.0",
+  "description": "Extract ranking data from Last War mobile game screenshots using AI",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "last-war": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "watch": "ts-node --watch src/index.ts",
+    "clean": "rm -rf dist",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "setup": "./scripts/quick-start.sh",
+    "create-structure": "./scripts/create-sample-structure.sh",
+    "extract": "npm run build && node dist/index.js"
+  },
+  "keywords": [
+    "last-war",
+    "screenshot",
+    "ocr",
+    "text-extraction",
+    "ai",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^16.4.5",
+    "fs-extra": "^11.2.0",
+    "ora": "^8.1.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^3.25.73"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.7.9",
+    "@typescript-eslint/eslint-plugin": "^8.11.0",
+    "@typescript-eslint/parser": "^8.11.0",
+    "eslint": "^9.13.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.3.3",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

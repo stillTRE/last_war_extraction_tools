@@ -1,0 +1,14 @@
+{
+  "aiProvider": {
+    "name": "openai",
+    "endpoint": "https://api.openai.com",
+    "model": "gpt-4-vision-preview",
+    "apiKey": "your-api-key-here"
+  },
+  "inputDirectory": "./screenshots",
+  "outputDirectory": "./output",
+  "exportFormat": "xlsx",
+  "batchSize": 5,
+  "retryAttempts": 3,
+  "delayBetweenRequests": 1000
+}
