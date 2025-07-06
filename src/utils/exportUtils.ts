@@ -1,8 +1,9 @@
-import * as fs from 'fs-extra';
+import fs from 'fs-extra';
 import * as path from 'path';
 import { createObjectCsvWriter } from 'csv-writer';
 import * as XLSX from 'xlsx';
-import { ExtractedData, ExportOptions, WeekData } from '../schema';
+import { ExtractedData, ExportOptions, WeekData } from '../schema.js';
+import { writeFileSync } from 'fs';
 
 export class ExportUtils {
   /**
@@ -21,11 +22,21 @@ export class ExportUtils {
 
     // Create filename based on week
     const baseDir = path.dirname(options.outputPath);
-    // TODO: Not great naming convention. Can be better. Perhaps here since export over the TODO in index.
-    const baseName = `week${week.weekNumber}_${week.weekDate}`;
-    const ext = `.${options.format}`;
 
-    const outputPath = path.join(baseDir, baseName + ext);
+    // Use the filename from the options if it includes a date, otherwise generate one
+    // This ensures we use the same filename as the backup when possible
+    let outputPath;
+    if (path.basename(options.outputPath).includes('_20')) {
+      // If the path already includes a date (like yyyy-mm-dd), use it directly
+      outputPath = options.outputPath;
+      console.log(`Using provided filename: ${outputPath}`);
+    } else {
+      // TODO: Not great naming convention. Can be better. Perhaps here since export over the TODO in index.
+      const baseName = `week${week.weekNumber}_${new Date().toISOString().split('T')[0]}`;
+      const ext = `.${options.format}`;
+      outputPath = path.join(baseDir, baseName + ext);
+      console.log(`Generated filename: ${outputPath}`);
+    }
 
     // Export based on format
     switch (options.format) {
@@ -54,6 +65,9 @@ export class ExportUtils {
   ): Promise<string> {
     const jsonData = metadata ? { week, metadata } : { week };
 
+    // Ensure the directory exists
+    await fs.ensureDir(path.dirname(outputPath));
+
     await fs.writeJSON(outputPath, jsonData, { spaces: 2 });
     return `Exported week ${week.weekNumber} to ${outputPath}`;
   }
@@ -66,27 +80,32 @@ export class ExportUtils {
     const baseName = path.basename(outputPath, '.csv');
     const exportedFiles: string[] = [];
 
-    // Export daily data to separate files
-    for (const day of week.dailyData) {
-      const dayFile = path.join(baseDir, `${baseName}_${day.day}.csv`);
+    // Ensure the directory exists
+    await fs.ensureDir(baseDir);
 
-      const records = day.entries.map(entry => ({
-        Rank: entry.rank,
-        CommanderName: entry.commanderName,
-        Points: entry.points,
-      }));
+    // Export daily data to separate files if we have any
+    if (week.dailyData.length > 0) {
+      for (const day of week.dailyData) {
+        const dayFile = path.join(baseDir, `${baseName}_${day.day}.csv`);
 
-      const csvWriter = createObjectCsvWriter({
-        path: dayFile,
-        header: [
-          { id: 'Rank', title: 'Rank' },
-          { id: 'CommanderName', title: 'Commander Name' },
-          { id: 'Points', title: 'Points' },
-        ],
-      });
+        const records = day.entries.map(entry => ({
+          Rank: entry.rank,
+          CommanderName: entry.commanderName,
+          Points: entry.points,
+        }));
 
-      await csvWriter.writeRecords(records);
-      exportedFiles.push(dayFile);
+        const csvWriter = createObjectCsvWriter({
+          path: dayFile,
+          header: [
+            { id: 'Rank', title: 'Rank' },
+            { id: 'CommanderName', title: 'Commander Name' },
+            { id: 'Points', title: 'Points' },
+          ],
+        });
+
+        await csvWriter.writeRecords(records);
+        exportedFiles.push(dayFile);
+      }
     }
 
     // Export weekly data if present
@@ -110,6 +129,9 @@ export class ExportUtils {
 
       await csvWriter.writeRecords(records);
       exportedFiles.push(weeklyFile);
+    } else if (week.dailyData.length === 0) {
+      // If we have no data at all
+      throw new Error('No data to export - both daily and weekly data are empty');
     }
 
     return `Exported week ${week.weekNumber} to ${exportedFiles.length} CSV files`;
@@ -122,15 +144,17 @@ export class ExportUtils {
     const workbook = XLSX.utils.book_new();
 
     // Add a sheet for each day
-    for (const day of week.dailyData) {
-      const sheetData = day.entries.map(entry => ({
-        Rank: entry.rank,
-        CommanderName: entry.commanderName,
-        Points: entry.points,
-      }));
+    if (week.dailyData.length > 0) {
+      for (const day of week.dailyData) {
+        const sheetData = day.entries.map(entry => ({
+          Rank: entry.rank,
+          CommanderName: entry.commanderName,
+          Points: entry.points,
+        }));
 
-      const worksheet = XLSX.utils.json_to_sheet(sheetData);
-      XLSX.utils.book_append_sheet(workbook, worksheet, day.day);
+        const worksheet = XLSX.utils.json_to_sheet(sheetData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, day.day);
+      }
     }
 
     // Add weekly data if present
@@ -143,6 +167,9 @@ export class ExportUtils {
 
       const worksheet = XLSX.utils.json_to_sheet(sheetData);
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Weekly');
+    } else {
+      // If we have no data at all, we can't export an empty workbook
+      throw new Error('No data to export - both daily and weekly data are empty');
     }
 
     // Add a summary sheet
@@ -160,8 +187,27 @@ export class ExportUtils {
     const summarySheet = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
 
-    // Write the file
-    XLSX.writeFile(workbook, outputPath);
+    // Ensure the directory exists
+    await fs.ensureDir(path.dirname(outputPath));
+
+    // Write the file using a different approach to avoid ES module issue with XLSX.writeFile
+    try {
+      console.log(`Attempting to write XLSX file to: ${outputPath}`);
+
+      // Convert workbook to a buffer
+      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+
+      // Write the buffer to the file using Node's fs.writeFileSync
+      writeFileSync(outputPath, wbout);
+
+      console.log(`Successfully wrote XLSX file to: ${outputPath}`);
+    } catch (xlsxError) {
+      console.error(`Error writing XLSX file: ${xlsxError}`);
+      console.error(`Error details:`, xlsxError);
+      throw new Error(
+        `Failed to write XLSX file: ${xlsxError instanceof Error ? xlsxError.message : String(xlsxError)}`
+      );
+    }
     return `Exported week ${week.weekNumber} to ${outputPath}`;
   }
 }

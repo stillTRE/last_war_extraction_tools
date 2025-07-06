@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Config, ConfigSchema } from '../schema';
+import { Config, ConfigSchema } from '../schema.js';
 import * as dotenv from 'dotenv';
 
 // Load environment variables
@@ -13,12 +13,13 @@ export class ConfigUtils {
     aiProvider: {
       name: 'openai',
       endpoint: 'https://api.openai.com',
-      model: 'gpt-4-vision-preview',
+      model: 'gpt-4o',
     },
     inputDirectory: './screenshots',
     outputDirectory: './output',
     exportFormat: 'json',
     delayBetweenRequests: 1000,
+    weeklyOnly: false,
   };
 
   /**

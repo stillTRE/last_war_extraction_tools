@@ -100,6 +100,7 @@ export const ConfigSchema = z.object({
   outputDirectory: z.string().default('./output'),
   exportFormat: z.enum(['json', 'csv', 'xlsx']).default('json'),
   delayBetweenRequests: z.number().int().nonnegative().default(1000),
+  weeklyOnly: z.boolean().default(false),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 

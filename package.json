@@ -10,15 +10,15 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
-    "watch": "ts-node --watch src/index.ts",
+    "dev": "ts-node --esm src/index.ts",
+    "watch": "ts-node --esm --watch src/index.ts",
     "clean": "rm -rf dist",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "setup": "./scripts/quick-start.sh",
     "create-structure": "./scripts/create-sample-structure.sh",
-    "extract": "npm run build && node dist/index.js"
+    "extract": "npm run build && node --enable-source-maps dist/index.js"
   },
   "keywords": [
     "last-war",

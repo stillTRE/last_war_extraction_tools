@@ -1,6 +1,6 @@
 import axios, { AxiosResponse } from 'axios';
-import { AIProvider, AIRequest, AIResponse, RankingEntry } from '../schema';
-import { AIServiceError } from '../schema';
+import { AIProvider, AIRequest, AIResponse, RankingEntry } from '../schema.js';
+import { AIServiceError } from '../schema.js';
 
 export class AIService {
   private provider: AIProvider;
@@ -21,7 +21,7 @@ export class AIService {
       const response = await this.makeAIRequest({
         imageBase64,
         prompt,
-        model: this.provider.model || 'gpt-4-vision-preview',
+        model: this.provider.model || 'gpt-4o',
       });
 
       return this.parseRankingResponse(response.extractedText);
@@ -83,7 +83,7 @@ export class AIService {
     return axios.post(
       `${this.provider.endpoint}/v1/chat/completions`,
       {
-        model: request.model || 'gpt-4-vision-preview',
+        model: request.model || 'gpt-4o',
         messages: [
           {
             role: 'user',
