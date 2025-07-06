@@ -1,4 +1,4 @@
-import { WeekData, DayData, ExtractedData, ProcessingResult, DayOfWeek } from '../schema';
+import { WeekData, DayData, ExtractedData, ProcessingResult, DayOfWeek } from '../schema.js';
 
 export class DataProcessor {
   /**
@@ -157,9 +157,18 @@ export class DataProcessor {
       issues.push('Missing week date');
     }
 
-    // Check daily data
+    // Check if we have any data at all (either daily or weekly)
+    if (weekData.dailyData.length === 0 && weekData.weeklyData.length === 0) {
+      issues.push('No data found (neither daily nor weekly)');
+      return { valid: false, issues };
+    }
+
+    // Check daily data if it exists
     if (weekData.dailyData.length === 0) {
-      issues.push('No daily data found');
+      // For weekly-only mode, this is not an error
+      if (weekData.weeklyData.length === 0) {
+        issues.push('No daily data found and no weekly data found');
+      }
     } else {
       weekData.dailyData.forEach(day => {
         if (!day.day || !Object.values(DayOfWeek).includes(day.day as any)) {
@@ -177,6 +186,16 @@ export class DataProcessor {
           }
         }
       });
+    }
+
+    // Check weekly data if it exists
+    if (weekData.weeklyData.length > 0) {
+      // Check for duplicate ranks in weekly data
+      const weeklyRanks = weekData.weeklyData.map(e => e.rank);
+      const uniqueWeeklyRanks = new Set(weeklyRanks);
+      if (weeklyRanks.length !== uniqueWeeklyRanks.size) {
+        issues.push(`Duplicate ranks found in weekly data`);
+      }
     }
 
     return {

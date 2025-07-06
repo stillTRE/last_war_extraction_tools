@@ -59,7 +59,7 @@ case $REPLY in
         ;;
     *)
         PROVIDER="openai"
-        MODEL="gpt-4-vision-preview"
+        MODEL="gpt-4o"
         ;;
 esac
 

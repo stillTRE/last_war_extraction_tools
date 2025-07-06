@@ -1,14 +1,15 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import * as path from 'path';
-import * as fs from 'fs-extra';
-import { FileSystemUtils } from './utils/fileSystem';
-import { ConfigUtils } from './utils/config';
-import { AIService } from './services/aiService';
-import { DataProcessor } from './processors/dataProcessor';
-import { ExportUtils } from './utils/exportUtils';
-import { Config, ProcessingResult, ScreenshotFile, ExportOptions } from './schema';
+import fs from 'fs-extra';
+import { FileSystemUtils } from './utils/fileSystem.js';
+import { ConfigUtils } from './utils/config.js';
+import { AIService } from './services/aiService.js';
+import { DataProcessor } from './processors/dataProcessor.js';
+import { ExportUtils } from './utils/exportUtils.js';
+import { Config, ProcessingResult, ScreenshotFile, ExportOptions } from './schema.js';
 
 const program = new Command();
 
@@ -25,6 +26,7 @@ program
   .option('-k, --apiKey <key>', 'API key for the AI service (or set AI_API_KEY env var)')
   .option('-p, --provider <provider>', 'AI provider to use: openai or anthropic', 'openai')
   .option('-m, --model <model>', 'AI model to use (provider-specific)')
+  .option('-w, --weekly-only', 'Process only the Weekly rankings (skip daily data)')
   .option('--dry-run', 'Show what would be processed without making API calls')
   .action(async (inputDir, options) => {
     // Create a spinner for visual feedback
@@ -53,7 +55,7 @@ program
       } else {
         // Set default models based on provider
         if (config.aiProvider.name === 'openai') {
-          config.aiProvider.model = 'gpt-4-vision-preview';
+          config.aiProvider.model = 'gpt-4o';
         } else if (config.aiProvider.name === 'anthropic') {
           config.aiProvider.model = 'claude-3-opus-20240229';
         }
@@ -95,15 +97,16 @@ program
       console.log(`  Screenshots: ${screenshots.length}`);
       // At this point, we're only working with a single week
       const weekName = screenshots[0]?.week || 'unknown';
-      console.log(`  Week: ${weekName}`);
+      console.log(`Week: ${weekName}`);
       console.log(
-        `  Days: ${Array.from(new Set(screenshots.map(s => s.day)))
+        `
+        Days: ${Array.from(new Set(screenshots.map(s => s.day)))
           .sort()
           .join(', ')}`
       );
-      console.log(`  AI Provider: ${config.aiProvider.name}`);
-      console.log(`  AI Model: ${config.aiProvider.model}`);
-      console.log(`  Output Format: ${config.exportFormat}`);
+      console.log(`AI Provider: ${config.aiProvider.name}`);
+      console.log(`AI Model: ${config.aiProvider.model}`);
+      console.log(`Output Format: ${config.exportFormat}`);
 
       // Simple cost estimate based on selected provider and model
       const costEstimate = ConfigUtils.estimateCost(
@@ -177,9 +180,30 @@ program
       // Export results
       spinner.text = 'Exporting results...';
 
+      // Ensure the results directory exists
+      await fs.ensureDir('results');
+
+      // Create a backup JSON export of the raw data first
+      const timestamp = new Date().toISOString().split('T')[0];
+      const baseFileName = `${weekName}_${timestamp}`;
+      const backupFileName = `${baseFileName}_backup.json`;
+      const backupPath = path.join('results', backupFileName);
+
+      try {
+        // Save backup data first
+        await fs.writeJSON(backupPath, extractedData, { spaces: 2 });
+        console.log(chalk.green(`✓ Backup data saved to: ${backupPath}`));
+      } catch (backupError) {
+        console.warn(
+          chalk.yellow(
+            `Warning: Failed to save backup data: ${backupError instanceof Error ? backupError.message : 'Unknown error'}`
+          )
+        );
+      }
+
       // Create a more readable filename with week information
-      const outputFileName = `${weekName}_${new Date().toISOString().split('T')[0]}.${config.exportFormat}`;
-      const outputPath = path.join(config.outputDirectory, outputFileName);
+      const outputFileName = `${baseFileName}.${config.exportFormat}`;
+      const outputPath = path.join('results', outputFileName);
 
       const exportOptions: ExportOptions = {
         format: config.exportFormat,
@@ -187,8 +211,19 @@ program
         includeMetadata: true,
       };
 
-      const exportResult = await ExportUtils.exportData(extractedData, exportOptions);
-      spinner.succeed(`Export completed: ${exportResult}`);
+      let exportResultPath = '';
+      try {
+        const exportResult = await ExportUtils.exportData(extractedData, exportOptions);
+        exportResultPath = outputPath;
+        spinner.succeed(`Export completed: ${exportResult}`);
+      } catch (exportError) {
+        spinner.fail(
+          `Export failed: ${exportError instanceof Error ? exportError.message : 'Unknown error'}`
+        );
+        console.log(
+          chalk.green(`But don't worry! Your data is safely backed up in: ${backupPath}`)
+        );
+      }
 
       // Display final summary
       const summary = DataProcessor.getDataSummary(processedWeek);
@@ -198,7 +233,7 @@ program
       console.log(
         `  Total entries: ${summary.entryCount + (summary.hasWeeklyData ? processedWeek.weeklyData.length : 0)}`
       );
-      console.log(`  Output path: ${exportResult}`);
+      console.log(`  Output path: ${exportResultPath || backupPath}`);
 
       const usage = aiService.getUsageStats();
       console.log(`  AI requests made: ${usage.requestCount}`);
